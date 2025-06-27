@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Resume Generator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .draggable-section {
+            cursor: grab;
+            user-select: none;
+            border: 1px dashed #d1d5db;
+        }
+        .draggable-section:active {
+            cursor: grabbing;
+        }
+        #resume-preview {
+            min-height: 80vh;
+            background-color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 0.75rem; /* rounded-xl */
+            padding: 2rem;
+            line-height: 1.5;
+            color: #374151; /* text-gray-700 */
+        }
+        [contenteditable]:focus {
+            outline: 2px solid #3b82f6; /* blue-500 */
+            outline-offset: 2px;
+            border-radius: 0.5rem;
+        }
+        .section-header {
+            font-weight: 600; /* font-semibold */
+            font-size: 1.5rem; /* text-2xl */
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #e5e7eb; /* border-gray-200 */
+            padding-bottom: 0.5rem;
+        }
+        .section-item {
+            margin-bottom: 1rem;
+        }
+        .section-item h3 {
+            font-weight: 600; /* font-semibold */
+            font-size: 1.125rem; /* text-lg */
+        }
+        .section-item .sub-info {
+            font-size: 0.875rem; /* text-sm */
+            color: #6b7280; /* text-gray-500 */
+        }
+        .section-item ul {
+            list-style-type: disc;
+            margin-left: 1.25rem; /* ml-5 */
+            padding-left: 0;
+        }
+        .section-item ul li {
+            margin-bottom: 0.25rem;
+        }
+        .placeholder-text {
+            color: #9ca3af; /* text-gray-400 */
+            font-style: italic;
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+                background-color: #ffffff;
+            }
+            .no-print {
+                display: none !important;
+            }
+            #resume-preview {
+                box-shadow: none;
+                border-radius: 0;
+                min-height: auto;
+                width: 210mm; /* A4 width */
+                height: 297mm; /* A4 height */
+                margin: 0;
+                padding: 20mm; /* Example margins */
+            }
+        }
+
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #e0e7ff; /* bg-indigo-50 */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #6366f1; /* indigo-500 */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4f46e5; /* indigo-600 */
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            max-width: 90%;
+            width: 400px;
+            text-align: center;
+        }
+        .ats-modal-content {
+            width: 600px; /* Wider for more content */
+            max-height: 90vh; /* Limit height for scrollability */
+            overflow-y: auto; /* Enable scrolling for long content */
+            text-align: left; /* Align text left for readability */
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+    <!-- Message Modal (for simple messages) -->
+    <div id="messageModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2 id="modalTitle" class="text-xl font-semibold mb-4"></h2>
+            <p id="modalMessage" class="mb-6"></p>
+            <button id="modalCloseButton" class="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">OK</button>
+        </div>
+    </div>
+
+    <!-- ATS Score Checker Modal -->
+    <div id="atsScoreModal" class="modal-overlay hidden">
+        <div class="modal-content ats-modal-content">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">ATS Compatibility Checker</h2>
+            <p class="text-gray-600 mb-6">Enter the job details below to get an ATS compatibility score and suggestions for your resume.</p>
+
+            <div class="mb-4">
+                <label for="jobTitleInput" class="block text-gray-700 text-sm font-semibold mb-2">Job Title</label>
+                <input type="text" id="jobTitleInput" class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="e.g., Software Engineer">
+            </div>
+            <div class="mb-6">
+                <label for="jobDescriptionInput" class="block text-gray-700 text-sm font-semibold mb-2">Job Description</label>
+                <textarea id="jobDescriptionInput" class="w-full px-4 py-2 border border-gray-300 rounded-md h-32 resize-y focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" placeholder="Paste the full job description here..."></textarea>
+            </div>
+
+            <button id="generateAtsScoreButton" class="w-full px-6 py-3 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center">
+                <i class="fas fa-robot mr-2"></i> Generate ATS Score
+            </button>
+
+            <div id="atsResults" class="mt-8 pt-6 border-t border-gray-200 hidden">
+                <h3 class="text-xl font-semibold mb-4 text-gray-800">ATS Analysis Results:</h3>
+                <p class="text-lg mb-2"><span class="font-bold">Compatibility:</span> <span id="atsCompatibility" class="text-green-600 font-semibold"></span></p>
+                <div class="mb-4">
+                    <h4 class="font-semibold text-gray-700">Key Observations:</h4>
+                    <ul id="atsObservations" class="list-disc ml-5 text-gray-600">
+                        <!-- Observations will be inserted here -->
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-gray-700">Suggestions for Improvement:</h4>
+                    <ul id="atsSuggestions" class="list-disc ml-5 text-gray-600">
+                        <!-- Suggestions will be inserted here -->
+                    </ul>
+                </div>
+            </div>
+            <button id="atsCloseButton" class="mt-6 px-6 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors">Close</button>
+        </div>
+    </div>
+
+
+    <header class="bg-indigo-700 text-white p-4 shadow-lg no-print">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold">Resume Builder</h1>
+            <div class="flex items-center space-x-4">
+                <button id="addSectionButton" class="px-4 py-2 bg-indigo-500 rounded-md hover:bg-indigo-600 transition-colors flex items-center">
+                    <i class="fas fa-plus-circle mr-2"></i>Add Section
+                </button>
+                <button id="checkAtsButton" class="px-4 py-2 bg-blue-500 rounded-md hover:bg-blue-600 transition-colors flex items-center">
+                    <i class="fas fa-check-circle mr-2"></i>Check ATS Score
+                </button>
+                <button id="exportPdfButton" class="px-4 py-2 bg-green-500 rounded-md hover:bg-green-600 transition-colors flex items-center">
+                    <i class="fas fa-file-pdf mr-2"></i>Export to PDF
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row p-4 gap-4 container mx-auto">
+        <!-- Draggable Sections Sidebar -->
+        <aside class="w-full lg:w-1/4 bg-white p-6 rounded-xl shadow-md no-print">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">Available Sections</h2>
+            <div id="draggable-sections" class="space-y-4">
+                <!-- Education Section Template -->
+                <div id="education-template" class="draggable-section p-4 bg-indigo-50 rounded-lg shadow-sm hover:shadow-md transition-shadow flex items-center" draggable="true">
+                    <i class="fas fa-graduation-cap text-indigo-600 mr-3"></i>
+                    <span class="font-medium text-indigo-800">Education</span>
+                </div>
+                <!-- Experience Section Template -->
+                <div id="experience-template" class="draggable-section p-4 bg-purple-50 rounded-lg shadow-sm hover:shadow-md transition-shadow flex items-center" draggable="true">
+                    <i class="fas fa-briefcase text-purple-600 mr-3"></i>
+                    <span class="font-medium text-purple-800">Experience</span>
+                </div>
+                <!-- Skills Section Template -->
+                <div id="skills-template" class="draggable-section p-4 bg-teal-50 rounded-lg shadow-sm hover:shadow-md transition-shadow flex items-center" draggable="true">
+                    <i class="fas fa-lightbulb text-teal-600 mr-3"></i>
+                    <span class="font-medium text-teal-800">Skills</span>
+                </div>
+                <!-- Projects Section Template -->
+                <div id="projects-template" class="draggable-section p-4 bg-orange-50 rounded-lg shadow-sm hover:shadow-md transition-shadow flex items-center" draggable="true">
+                    <i class="fas fa-code-branch text-orange-600 mr-3"></i>
+                    <span class="font-medium text-orange-800">Projects</span>
+                </div>
+                <!-- Contact Info Section Template -->
+                <div id="contact-template" class="draggable-section p-4 bg-blue-50 rounded-lg shadow-sm hover:shadow-md transition-shadow flex items-center" draggable="true">
+                    <i class="fas fa-address-card text-blue-600 mr-3"></i>
+                    <span class="font-medium text-blue-800">Contact Info</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Resume Preview Area -->
+        <section id="resume-preview-container" class="flex-1 overflow-auto bg-white p-4 rounded-xl shadow-md relative">
+            <h2 class="sr-only">Resume Live Preview</h2>
+            <div id="resume-preview" class="p-8 pb-16 relative">
+                <!-- Initial Placeholder or editable name/contact -->
+                <div class="mb-8 text-center">
+                    <h1 contenteditable="true" class="text-4xl font-bold text-gray-800 mb-2 placeholder-text">Your Name</h1>
+                    <p contenteditable="true" class="text-lg text-gray-600 placeholder-text">Your Professional Title</p>
+                    <div contenteditable="true" class="text-md text-gray-500 mt-2 flex flex-wrap justify-center gap-x-4 placeholder-text">
+                        <span><i class="fas fa-envelope mr-1"></i>email@example.com</span>
+                        <span><i class="fas fa-phone mr-1"></i>(123) 456-7890</span>
+                        <span><i class="fas fa-map-marker-alt mr-1"></i>City, State</span>
+                        <span><i class="fab fa-linkedin mr-1"></i>linkedin.com/in/yourprofile</span>
+                    </div>
+                </div>
+
+                <!-- Dropped sections will go here -->
+                <p id="drop-hint" class="text-center text-gray-400 mt-10 text-lg">Drag and drop sections here to build your resume.</p>
+            </div>
+            <!-- Loading overlay for PDF export -->
+            <div id="loadingOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-75 flex justify-center items-center text-white text-xl hidden rounded-xl">
+                <i class="fas fa-spinner fa-spin mr-3"></i> Generating PDF...
+            </div>
+            <!-- Loading overlay for ATS check -->
+            <div id="atsLoadingOverlay" class="absolute inset-0 bg-gray-900 bg-opacity-75 flex justify-center items-center text-white text-xl hidden rounded-xl">
+                <i class="fas fa-spinner fa-spin mr-3"></i> Analyzing Resume...
+            </div>
+        </section>
+    </main>
+
+    <!-- JS Libraries for PDF generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+        const resumePreview = document.getElementById('resume-preview');
+        const draggableSections = document.querySelectorAll('.draggable-section');
+        const exportPdfButton = document.getElementById('exportPdfButton');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const dropHint = document.getElementById('drop-hint');
+        const addSectionButton = document.getElementById('addSectionButton');
+        const checkAtsButton = document.getElementById('checkAtsButton');
+        const atsLoadingOverlay = document.getElementById('atsLoadingOverlay');
+
+        // Message Modal elements
+        const messageModal = document.getElementById('messageModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalCloseButton = document.getElementById('modalCloseButton');
+
+        // ATS Score Modal elements
+        const atsScoreModal = document.getElementById('atsScoreModal');
+        const jobTitleInput = document.getElementById('jobTitleInput');
+        const jobDescriptionInput = document.getElementById('jobDescriptionInput');
+        const generateAtsScoreButton = document.getElementById('generateAtsScoreButton');
+        const atsResults = document.getElementById('atsResults');
+        const atsCompatibility = document.getElementById('atsCompatibility');
+        const atsObservations = document.getElementById('atsObservations');
+        const atsSuggestions = document.getElementById('atsSuggestions');
+        const atsCloseButton = document.getElementById('atsCloseButton');
+
+        let draggedSectionId = null;
+        let isDraggingOver = false;
+
+        // Function to show custom message modal
+        function showMessage(title, message) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            messageModal.classList.remove('hidden');
+        }
+
+        modalCloseButton.addEventListener('click', () => {
+            messageModal.classList.add('hidden');
+        });
+
+        // Initialize unique IDs for sections
+        let sectionCounter = 0;
+
+        // Templates for different sections
+        const sectionTemplates = {
+            'education-template': `
+                <div class="section-container border border-gray-200 rounded-lg p-6 mb-6 relative group bg-white shadow-sm">
+                    <div class="flex justify-end gap-2 text-gray-500 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                        <button class="add-item-btn text-green-500 hover:text-green-700 text-lg" title="Add Education Entry"><i class="fas fa-plus-square"></i></button>
+                        <button class="delete-section-btn text-red-500 hover:text-red-700 text-lg" title="Delete Section"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                    <h2 contenteditable="true" class="section-header placeholder-text">Education</h2>
+                    <div class="section-items">
+                        <div class="section-item border-b border-gray-100 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0 relative group/item">
+                            <div class="flex justify-end gap-2 text-gray-400 absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity no-print">
+                                <button class="delete-item-btn text-red-400 hover:text-red-600 text-sm" title="Delete Entry"><i class="fas fa-minus-square"></i></button>
+                            </div>
+                            <h3 contenteditable="true" class="placeholder-text">University Name, Location</h3>
+                            <p contenteditable="true" class="sub-info placeholder-text">Degree | Major | Graduation Date</p>
+                            <ul contenteditable="true" class="mt-2 placeholder-text">
+                                <li>Relevant coursework and projects.</li>
+                                <li>Academic achievements or honors.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `,
+            'experience-template': `
+                <div class="section-container border border-gray-200 rounded-lg p-6 mb-6 relative group bg-white shadow-sm">
+                    <div class="flex justify-end gap-2 text-gray-500 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                        <button class="add-item-btn text-green-500 hover:text-green-700 text-lg" title="Add Experience Entry"><i class="fas fa-plus-square"></i></button>
+                        <button class="delete-section-btn text-red-500 hover:text-red-700 text-lg" title="Delete Section"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                    <h2 contenteditable="true" class="section-header placeholder-text">Experience</h2>
+                    <div class="section-items">
+                        <div class="section-item border-b border-gray-100 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0 relative group/item">
+                            <div class="flex justify-end gap-2 text-gray-400 absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity no-print">
+                                <button class="delete-item-btn text-red-400 hover:text-red-600 text-sm" title="Delete Entry"><i class="fas fa-minus-square"></i></button>
+                            </div>
+                            <h3 contenteditable="true" class="placeholder-text">Job Title at Company Name, Location</h3>
+                            <p contenteditable="true" class="sub-info placeholder-text">Month Year – Month Year</p>
+                            <ul contenteditable="true" class="mt-2 placeholder-text">
+                                <li>Achieved [X] by doing [Y], measured by [Z].</li>
+                                <li>Developed and implemented [X] resulting in [Y] improvement.</li>
+                                <li>Collaborated with [X] team members on [Y] projects.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `,
+            'skills-template': `
+                <div class="section-container border border-gray-200 rounded-lg p-6 mb-6 relative group bg-white shadow-sm">
+                    <div class="flex justify-end gap-2 text-gray-500 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                        <button class="add-item-btn text-green-500 hover:text-green-700 text-lg" title="Add Skill Category"><i class="fas fa-plus-square"></i></button>
+                        <button class="delete-section-btn text-red-500 hover:text-red-700 text-lg" title="Delete Section"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                    <h2 contenteditable="true" class="section-header placeholder-text">Skills</h2>
+                    <div class="section-items">
+                        <div class="section-item border-b border-gray-100 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0 relative group/item">
+                            <div class="flex justify-end gap-2 text-gray-400 absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity no-print">
+                                <button class="delete-item-btn text-red-400 hover:text-red-600 text-sm" title="Delete Entry"><i class="fas fa-minus-square"></i></button>
+                            </div>
+                            <h3 contenteditable="true" class="placeholder-text">Programming Languages:</h3>
+                            <p contenteditable="true" class="placeholder-text">JavaScript, Python, Java, C++</p>
+                        </div>
+                        <div class="section-item border-b border-gray-100 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0 relative group/item">
+                            <div class="flex justify-end gap-2 text-gray-400 absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity no-print">
+                                <button class="delete-item-btn text-red-400 hover:text-red-600 text-sm" title="Delete Entry"><i class="fas fa-minus-square"></i></button>
+                            </div>
+                            <h3 contenteditable="true" class="placeholder-text">Frameworks:</h3>
+                            <p contenteditable="true" class="placeholder-text">React, Node.js, Django, Spring Boot</p>
+                        </div>
+                    </div>
+                </div>
+            `,
+            'projects-template': `
+                <div class="section-container border border-gray-200 rounded-lg p-6 mb-6 relative group bg-white shadow-sm">
+                    <div class="flex justify-end gap-2 text-gray-500 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                        <button class="add-item-btn text-green-500 hover:text-green-700 text-lg" title="Add Project Entry"><i class="fas fa-plus-square"></i></button>
+                        <button class="delete-section-btn text-red-500 hover:text-red-700 text-lg" title="Delete Section"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                    <h2 contenteditable="true" class="section-header placeholder-text">Projects</h2>
+                    <div class="section-items">
+                        <div class="section-item border-b border-gray-100 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0 relative group/item">
+                            <div class="flex justify-end gap-2 text-gray-400 absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity no-print">
+                                <button class="delete-item-btn text-red-400 hover:text-red-600 text-sm" title="Delete Entry"><i class="fas fa-minus-square"></i></button>
+                            </div>
+                            <h3 contenteditable="true" class="placeholder-text">Project Title <span class="sub-info">| Link to project (if any)</span></h3>
+                            <p contenteditable="true" class="sub-info placeholder-text">Technologies Used: React, Node.js, MongoDB</p>
+                            <ul contenteditable="true" class="mt-2 placeholder-text">
+                                <li>Brief description of the project and your role.</li>
+                                <li>Key features implemented and technologies used.</li>
+                                <li>Impact or results achieved.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `,
+             'contact-template': `
+                <div class="section-container border border-gray-200 rounded-lg p-6 mb-6 relative group bg-white shadow-sm">
+                    <div class="flex justify-end gap-2 text-gray-500 absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                        <button class="delete-section-btn text-red-500 hover:text-red-700 text-lg" title="Delete Section"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                    <h2 contenteditable="true" class="section-header placeholder-text">Contact Information</h2>
+                    <div class="section-items">
+                        <div class="section-item">
+                            <p contenteditable="true" class="placeholder-text"><i class="fas fa-envelope mr-2"></i>email@example.com</p>
+                            <p contenteditable="true" class="placeholder-text"><i class="fas fa-phone mr-2"></i>(123) 456-7890</p>
+                            <p contenteditable="true" class="placeholder-text"><i class="fas fa-map-marker-alt mr-2"></i>City, State, Country</p>
+                            <p contenteditable="true" class="placeholder-text"><i class="fab fa-linkedin mr-2"></i><a href="#" class="text-blue-600 hover:underline">linkedin.com/in/yourprofile</a></p>
+                            <p contenteditable="true" class="placeholder-text"><i class="fab fa-github mr-2"></i><a href="#" class="text-blue-600 hover:underline">github.com/yourprofile</a></p>
+                        </div>
+                    </div>
+                </div>
+            `
+        };
+
+        const itemTemplates = {
+            'education-item': `
+                <div class="section-item border-b border-gray-100 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0 relative group/item">
+                    <div class="flex justify-end gap-2 text-gray-400 absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity no-print">
+                        <button class="delete-item-btn text-red-400 hover:text-red-600 text-sm" title="Delete Entry"><i class="fas fa-minus-square"></i></button>
+                    </div>
+                    <h3 contenteditable="true" class="placeholder-text">New University, Location</h3>
+                    <p contenteditable="true" class="sub-info placeholder-text">New Degree | New Major | New Graduation Date</p>
+                    <ul contenteditable="true" class="mt-2 placeholder-text">
+                        <li>New relevant coursework and projects.</li>
+                        <li>New academic achievements or honors.</li>
+                    </ul>
+                </div>
+            `,
+            'experience-item': `
+                <div class="section-item border-b border-gray-100 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0 relative group/item">
+                    <div class="flex justify-end gap-2 text-gray-400 absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity no-print">
+                        <button class="delete-item-btn text-red-400 hover:text-red-600 text-sm" title="Delete Entry"><i class="fas fa-minus-square"></i></button>
+                    </div>
+                    <h3 contenteditable="true" class="placeholder-text">New Job Title at New Company Name, Location</h3>
+                    <p contenteditable="true" class="sub-info placeholder-text">Month Year – Month Year</p>
+                    <ul contenteditable="true" class="mt-2 placeholder-text">
+                        <li>New achievement: achieved [X] by doing [Y].</li>
+                        <li>New responsibility: developed [X] leading to [Y].</li>
+                    </ul>
+                </div>
+            `,
+            'skills-item': `
+                <div class="section-item border-b border-gray-100 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0 relative group/item">
+                    <div class="flex justify-end gap-2 text-gray-400 absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity no-print">
+                        <button class="delete-item-btn text-red-400 hover:text-red-600 text-sm" title="Delete Entry"><i class="fas fa-minus-square"></i></button>
+                    </div>
+                    <h3 contenteditable="true" class="placeholder-text">New Skill Category:</h3>
+                    <p contenteditable="true" class="placeholder-text">Skill1, Skill2, Skill3</p>
+                </div>
+            `,
+            'projects-item': `
+                <div class="section-item border-b border-gray-100 pb-4 mb-4 last:border-b-0 last:pb-0 last:mb-0 relative group/item">
+                    <div class="flex justify-end gap-2 text-gray-400 absolute top-0 right-0 opacity-0 group-hover/item:opacity-100 transition-opacity no-print">
+                        <button class="delete-item-btn text-red-400 hover:text-red-600 text-sm" title="Delete Entry"><i class="fas fa-minus-square"></i></button>
+                    </div>
+                    <h3 contenteditable="true" class="placeholder-text">New Project Title <span class="sub-info">| Link</span></h3>
+                    <p contenteditable="true" class="sub-info placeholder-text">Technologies Used: New Tech1, New Tech2</p>
+                    <ul contenteditable="true" class="mt-2 placeholder-text">
+                        <li>New description of the project.</li>
+                        <li>New features and impact.</li>
+                    </ul>
+                </div>
+            `
+        };
+
+
+        // --- Drag and Drop Logic ---
+
+        draggableSections.forEach(section => {
+            section.addEventListener('dragstart', (e) => {
+                draggedSectionId = e.target.id;
+                e.dataTransfer.effectAllowed = 'copy';
+            });
+        });
+
+        resumePreview.addEventListener('dragover', (e) => {
+            e.preventDefault(); // Necessary to allow drop
+            e.dataTransfer.dropEffect = 'copy';
+            if (!isDraggingOver) {
+                resumePreview.classList.add('border-4', 'border-blue-400', 'border-dashed');
+                isDraggingOver = true;
+            }
+        });
+
+        resumePreview.addEventListener('dragleave', () => {
+            resumePreview.classList.remove('border-4', 'border-blue-400', 'border-dashed');
+            isDraggingOver = false;
+        });
+
+        resumePreview.addEventListener('drop', (e) => {
+            e.preventDefault();
+            resumePreview.classList.remove('border-4', 'border-blue-400', 'border-dashed');
+            isDraggingOver = false;
+
+            if (draggedSectionId) {
+                const templateHtml = sectionTemplates[draggedSectionId];
+                if (templateHtml) {
+                    dropHint.classList.add('hidden'); // Hide hint once a section is dropped
+
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = templateHtml.trim();
+                    const newSection = tempDiv.firstChild;
+
+                    // Assign a unique ID to the new section for management
+                    newSection.dataset.sectionType = draggedSectionId.replace('-template', '');
+                    newSection.id = `section-${newSection.dataset.sectionType}-${sectionCounter++}`;
+
+                    resumePreview.appendChild(newSection);
+                    addSectionEventListeners(newSection); // Add event listeners to the new section's buttons
+                    draggedSectionId = null; // Reset dragged ID
+                } else {
+                    showMessage('Error', 'Invalid section template.');
+                }
+            }
+        });
+
+        // Function to attach event listeners to added sections (delete section, add item, delete item)
+        function addSectionEventListeners(sectionElement) {
+            // Delete Section Button
+            const deleteSectionBtn = sectionElement.querySelector('.delete-section-btn');
+            if (deleteSectionBtn) {
+                deleteSectionBtn.addEventListener('click', () => {
+                    sectionElement.remove();
+                    if (resumePreview.querySelectorAll('.section-container').length === 0) {
+                        dropHint.classList.remove('hidden'); // Show hint if all sections are removed
+                    }
+                });
+            }
+
+            // Add Item Button
+            const addItemBtn = sectionElement.querySelector('.add-item-btn');
+            if (addItemBtn) {
+                addItemBtn.addEventListener('click', () => {
+                    const sectionType = sectionElement.dataset.sectionType;
+                    const itemTemplate = itemTemplates[`${sectionType}-item`];
+                    if (itemTemplate) {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = itemTemplate.trim();
+                        const newItem = tempDiv.firstChild;
+                        sectionElement.querySelector('.section-items').appendChild(newItem);
+                        // Add event listener to the new item's delete button
+                        addItemDeleteListener(newItem);
+                    } else {
+                        showMessage('Error', `No item template found for ${sectionType}.`);
+                    }
+                });
+            }
+
+            // Delete Item Buttons (for initial items and newly added ones)
+            const deleteItemBtns = sectionElement.querySelectorAll('.delete-item-btn');
+            deleteItemBtns.forEach(button => {
+                addItemDeleteListener(button.closest('.section-item'));
+            });
+        }
+
+        // Helper to add delete listener to individual section items
+        function addItemDeleteListener(itemElement) {
+            const deleteItemBtn = itemElement.querySelector('.delete-item-btn');
+            if (deleteItemBtn) {
+                deleteItemBtn.addEventListener('click', () => {
+                    itemElement.remove();
+                });
+            }
+        }
+
+        // Add section event listeners to any pre-existing sections (though none are pre-existing in this setup)
+        document.querySelectorAll('.section-container').forEach(addSectionEventListeners);
+
+        // Make sections in preview sortable (simple up/down buttons)
+        addSectionButton.addEventListener('click', () => {
+             showMessage('Feature Coming Soon', 'The "Add Section" button will eventually allow you to add custom sections or predefined sections from a dialog. For now, please use drag-and-drop from the left sidebar.');
+        });
+
+
+        // --- PDF Export Logic ---
+
+        exportPdfButton.addEventListener('click', async () => {
+            loadingOverlay.classList.remove('hidden'); // Show loading overlay
+
+            // Temporarily hide control buttons that shouldn't be in PDF
+            document.querySelectorAll('.no-print').forEach(el => el.classList.add('hidden'));
+
+            try {
+                // Ensure the jspdf library is loaded and accessible via window.jspdf.jsPDF
+                if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined') {
+                    throw new Error('jsPDF library not loaded correctly.');
+                }
+
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF('p', 'pt', 'a4'); // 'p' for portrait, 'pt' for points, 'a4' for A4 size
+
+                // Get the resume preview element
+                const element = resumePreview;
+
+                // Use html2canvas to render the HTML to a canvas
+                const canvas = await html2canvas(element, {
+                    scale: 2, // Increase scale for better resolution
+                    useCORS: true, // If you have external images (though not used here)
+                    logging: false // Disable logging for cleaner console
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const imgWidth = 595.28; // A4 width in pt (210mm)
+                const pageHeight = 841.89; // A4 height in pt (297mm)
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 0;
+
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+
+                pdf.save('resume.pdf');
+                showMessage('Success!', 'Your resume has been exported to PDF.');
+
+            } catch (error) {
+                console.error("Error generating PDF:", error);
+                showMessage('Error Exporting PDF', 'There was an issue generating your PDF. Please try again. Details: ' + error.message);
+            } finally {
+                loadingOverlay.classList.add('hidden'); // Hide loading overlay
+                // Restore hidden control buttons
+                document.querySelectorAll('.no-print').forEach(el => el.classList.remove('hidden'));
+            }
+        });
+
+        // Add a basic listener for the placeholder text to clear on first focus
+        document.querySelectorAll('[contenteditable="true"]').forEach(el => {
+            el.addEventListener('focus', function() {
+                if (this.classList.contains('placeholder-text')) {
+                    this.textContent = '';
+                    this.classList.remove('placeholder-text');
+                }
+            });
+            el.addEventListener('blur', function() {
+                if (this.textContent.trim() === '') {
+                    this.classList.add('placeholder-text');
+                    // Re-add default text based on context if possible, or leave blank
+                    if (this.tagName === 'H1') this.textContent = 'Your Name';
+                    else if (this.tagName === 'P' && this.parentElement.classList.contains('mb-8')) this.textContent = 'Your Professional Title';
+                    else if (this.tagName === 'UL') this.innerHTML = '<li>Achieved [X] by doing [Y].</li>';
+                }
+            });
+        });
+
+        // --- ATS Score Checker Logic ---
+        checkAtsButton.addEventListener('click', () => {
+            atsScoreModal.classList.remove('hidden');
+            // Reset fields and results
+            jobTitleInput.value = '';
+            jobDescriptionInput.value = '';
+            atsResults.classList.add('hidden');
+            atsCompatibility.textContent = '';
+            atsObservations.innerHTML = '';
+            atsSuggestions.innerHTML = '';
+        });
+
+        atsCloseButton.addEventListener('click', () => {
+            atsScoreModal.classList.add('hidden');
+        });
+
+        generateAtsScoreButton.addEventListener('click', async () => {
+            const jobTitle = jobTitleInput.value.trim();
+            const jobDescription = jobDescriptionInput.value.trim();
+            const resumeContent = resumePreview.innerText; // Get all visible text from the resume
+
+            if (!jobTitle || !jobDescription || resumeContent.length < 50) {
+                showMessage('Missing Information', 'Please provide a job title, job description, and ensure your resume has content before checking ATS compatibility.');
+                return;
+            }
+
+            atsLoadingOverlay.classList.remove('hidden'); // Show ATS loading overlay
+            atsResults.classList.add('hidden'); // Hide previous results
+
+            try {
+                // Construct the prompt for the LLM
+                const prompt = `Act as an Applicant Tracking System (ATS) and a resume expert. I will provide you with a resume and a job description. Your task is to analyze the resume's compatibility with the job description, focusing on keyword matching, formatting, clarity, and overall suitability for an ATS.
+
+Resume Content:\n\`\`\`\n${resumeContent}\n\`\`\`
+
+Job Title: ${jobTitle}
+Job Description:\n\`\`\`\n${jobDescription}\n\`\`\`
+
+Provide your analysis in a JSON format with the following structure:
+{
+    "compatibility": "High" | "Medium" | "Low",
+    "observations": [
+        "Observation 1",
+        "Observation 2"
+    ],
+    "suggestions": [
+        "Suggestion 1",
+        "Suggestion 2"
+    ]
+}
+
+Ensure 'observations' and 'suggestions' are lists of concise bullet points. Focus on actionable advice for improving ATS compatibility.`;
+
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = {
+                    contents: chatHistory,
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                "compatibility": { "type": "STRING", "enum": ["High", "Medium", "Low"] },
+                                "observations": {
+                                    "type": "ARRAY",
+                                    "items": { "type": "STRING" }
+                                },
+                                "suggestions": {
+                                    "type": "ARRAY",
+                                    "items": { "type": "STRING" }
+                                }
+                            },
+                            "propertyOrdering": ["compatibility", "observations", "suggestions"]
+                        }
+                    }
+                };
+
+                const apiKey = ""; // API key will be provided by Canvas runtime
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                console.log("LLM Raw Result:", result); // Debugging
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const jsonString = result.candidates[0].content.parts[0].text;
+                    const atsAnalysis = JSON.parse(jsonString);
+
+                    // Display results
+                    atsCompatibility.textContent = atsAnalysis.compatibility;
+                    if (atsAnalysis.compatibility === 'High') {
+                        atsCompatibility.classList.remove('text-red-600', 'text-orange-600');
+                        atsCompatibility.classList.add('text-green-600');
+                    } else if (atsAnalysis.compatibility === 'Medium') {
+                        atsCompatibility.classList.remove('text-green-600', 'text-red-600');
+                        atsCompatibility.classList.add('text-orange-600');
+                    } else {
+                        atsCompatibility.classList.remove('text-green-600', 'text-orange-600');
+                        atsCompatibility.classList.add('text-red-600');
+                    }
+
+                    atsObservations.innerHTML = '';
+                    atsAnalysis.observations.forEach(obs => {
+                        const li = document.createElement('li');
+                        li.textContent = obs;
+                        atsObservations.appendChild(li);
+                    });
+
+                    atsSuggestions.innerHTML = '';
+                    atsAnalysis.suggestions.forEach(sugg => {
+                        const li = document.createElement('li');
+                        li.textContent = sugg;
+                        atsSuggestions.appendChild(li);
+                    });
+
+                    atsResults.classList.remove('hidden'); // Show results section
+
+                } else {
+                    showMessage('ATS Analysis Error', 'Could not get a valid analysis from the AI. Please try again.');
+                    console.error("LLM response structure unexpected:", result);
+                }
+
+            } catch (error) {
+                console.error("Error during ATS analysis:", error);
+                showMessage('ATS Analysis Failed', 'An error occurred during analysis. Please ensure your internet connection is stable and try again. Details: ' + error.message);
+            } finally {
+                atsLoadingOverlay.classList.add('hidden'); // Hide ATS loading overlay
+            }
+        });
+    </script>
+</body>
+</html>
+
